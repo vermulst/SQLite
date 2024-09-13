@@ -1,0 +1,23 @@
+name: VermulstUtils
+version: '1.0'
+main: me.vermulst.vermulstutils.Main
+description: plugin for general utilities
+api-version: '1.21.1'
+#bootstrapper: me.vermulst.vermulstutils.MainBootstrap
+#loader: me.vermulst.vermulstutils.MainLoader
+load: STARTUP
+#dependencies:
+  #server:
+  #  SQLite:
+  #    required: true
+  #    join-classpath: true
+  #  Citizens:
+  #    required: true
+  #    join-classpath: true
+  #  LuckPerms:
+  #    load: BEFORE
+  #    required: true
+  #    join-classpath: true
+#permissions:
+#  sand.admin:
+#    default: op

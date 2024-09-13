@@ -1,0 +1,73 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '8.3.1'
+    id 'io.papermc.paperweight.userdev' version "1.7.2"
+}
+
+group = 'me.vermulst'
+version = '1.0-SNAPSHOT'
+
+allprojects {
+    //buildDir = "C:/Users/SAM/Desktop/1.21/plugins"
+    buildDir = "C:/Users/20233490/Desktop/PLUGINS"
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = "papermc-repo"
+        url = "https://repo.papermc.io/repository/maven-public/"
+    }
+    maven {
+        name = "sonatype"
+        url = "https://oss.sonatype.org/content/groups/public/"
+    }
+}
+
+dependencies {
+    paperweight.paperDevBundle("1.21.1-R0.1-SNAPSHOT")
+}
+
+def targetJavaVersion = 21
+java {
+    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+    sourceCompatibility = javaVersion
+    targetCompatibility = javaVersion
+    if (JavaVersion.current() < javaVersion) {
+        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+        options.release = targetJavaVersion
+    }
+}
+
+processResources {
+    def props = [version: version]
+    inputs.properties props
+    filteringCharset 'UTF-8'
+    filesMatching('paper-plugin.yml') {
+        expand props
+    }
+}
+
+
+shadowJar {
+    archiveBaseName.set("${project.name}-${project.version}")
+    archiveClassifier.set('')
+    archiveVersion.set('')
+    destinationDirectory.set(file("$buildDir"))
+}
+
+task cleanFolders(type: Delete) {
+    delete "$buildDir/libs"
+    delete "$buildDir/classes"
+    delete "$buildDir/generated"
+    delete "$buildDir/resources"
+    delete "$buildDir/tmp"
+}
+
+shadowJar.finalizedBy(reobfJar)
+shadowJar.finalizedBy(cleanFolders)
