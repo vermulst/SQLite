@@ -4,6 +4,8 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/VermulstUtils.main.iml" filepath="$PROJECT_DIR$/.idea/modules/VermulstUtils.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/VermulstUtils.test.iml" filepath="$PROJECT_DIR$/.idea/modules/VermulstUtils.test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/me.vermulst.VermulstUtils.main.iml" filepath="$PROJECT_DIR$/.idea/modules/me.vermulst.VermulstUtils.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/me.vermulst.VermulstUtils.test.iml" filepath="$PROJECT_DIR$/.idea/modules/me.vermulst.VermulstUtils.test.iml" />
     </modules>
   </component>
 </project>
