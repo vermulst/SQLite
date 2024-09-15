@@ -2,10 +2,10 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/VSQlite.main.iml" filepath="$PROJECT_DIR$/.idea/modules/VSQlite.main.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/VSQlite.test.iml" filepath="$PROJECT_DIR$/.idea/modules/VSQlite.test.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/VermulstUtils.main.iml" filepath="$PROJECT_DIR$/.idea/modules/VermulstUtils.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/VermulstUtils.test.iml" filepath="$PROJECT_DIR$/.idea/modules/VermulstUtils.test.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/me.vermulst.VermulstUtils.main.iml" filepath="$PROJECT_DIR$/.idea/modules/me.vermulst.VermulstUtils.main.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/modules/me.vermulst.VermulstUtils.test.iml" filepath="$PROJECT_DIR$/.idea/modules/me.vermulst.VermulstUtils.test.iml" />
     </modules>
   </component>
 </project>

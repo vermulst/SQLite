@@ -1,4 +1,4 @@
-name: VermulstUtils
+name: VSQLite
 version: '1.0'
 main: me.vermulst.vermulstutils.Main
 description: plugin for general utilities
