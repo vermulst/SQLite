@@ -23,7 +23,8 @@ public class Database {
         try (Connection connection = this.getConnection()) {
             for (Table.Builder builder : tableBuilders) {
                 Table table = builder.build(connection);
-                this.addTable(table, connection);
+                this.addTable(table);
+                System.out.println("added table");
             }
             connection.commit();
         } catch (SQLException e) {
@@ -41,21 +42,11 @@ public class Database {
     }
 
     public void addTable(Table<?> table) {
-        try (Connection connection = this.getConnection()) {
-            this.addTable(table, connection);
-            connection.commit();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public void addTable(Table<?> table, Connection connection) {
         Set<String> tableNames = this.getTableNames();
         if (tableNames.contains(table.getName())) {
             this.tables.removeIf(table1 -> table1.getName().equalsIgnoreCase(table.getName()));
         }
         this.tables.add(table);
-        table.createOrUpdate(connection);
     }
 
     public <PK> Table<PK> getTable(Class<PK> tableType, String name) {
@@ -63,8 +54,8 @@ public class Database {
                 .filter(table -> name.equalsIgnoreCase(table.getName()))
                 .findFirst();
         // Perform type checking or casting based on tableType
-        if (tableOptional.isPresent() && tableType.isInstance(tableOptional.get())) {
-            return (Table<PK>) tableType.cast(tableOptional.get());
+        if (tableOptional.isPresent() && tableType.equals(tableOptional.get().getType())) {
+            return (Table<PK>) tableOptional.get();
         }
         return null;
     }
@@ -154,6 +145,8 @@ public class Database {
         private String path;
         private Set<Table.Builder> builders = new HashSet<>();
         private boolean addExistingTables = false;
+        private Set<Table.Builder> addAndOverride;
+        private Set<Table.Builder> addIfNotExists;
 
         private Builder() {
 
@@ -166,8 +159,41 @@ public class Database {
         }
 
         public Builder addTablesIfNotExists(Table.Builder... tableBuilders) {
-            this.builders = Set.of(tableBuilders);
+            this.addIfNotExists = Set.of(tableBuilders);
             return this;
+        }
+
+        public Builder addAndOverride(Table.Builder... tableBuilders) {
+            this.addAndOverride = Set.of(tableBuilders);
+            return this;
+        }
+
+        private Builder addTablesIfNotExists() {
+            if (this.addIfNotExists == null) return this;
+            addLoop:
+            for (Table.Builder addedBuilder : this.addIfNotExists) {
+                String name = addedBuilder.getName();
+                for (Table.Builder builder : this.builders) {
+                    if (builder.getName().equals(name)) continue addLoop;
+                }
+                this.builders.add(addedBuilder);
+            }
+            return this;
+        }
+
+        private void addAndOverride() {
+            if (this.addAndOverride == null) return;
+            Set<Table.Builder> removedBuilders = new HashSet<>();
+            for (Table.Builder addedBuilder : this.addAndOverride) {
+                String name = addedBuilder.getName();
+                for (Table.Builder builder : this.builders) {
+                    if (builder.getName().equals(name)) {
+                        removedBuilders.add(builder);
+                    }
+                }
+            }
+            this.builders.removeAll(removedBuilders);
+            this.builders.addAll(this.addAndOverride);
         }
 
         public Builder addExistingTables() {
@@ -175,7 +201,8 @@ public class Database {
             return this;
         }
 
-        private void addExistingTables(Database database) {
+        private Builder addExistingTables(Database database) {
+            if (!addExistingTables) return this;
             try (Connection connection = database.getConnection()) {
                 List<String> tableNames = new ArrayList<>();
                 DatabaseMetaData metaData = connection.getMetaData();
@@ -187,15 +214,15 @@ public class Database {
                 rs.close();
                 for (String tableName : tableNames) {
                     Class<?> tableClass = this.determinePrimaryKeyClass(connection, tableName);
-                    Table<?> table = Table.builder(tableClass)
+                    Table.Builder tableBuilder = Table.builder(tableClass)
                             .name(tableName)
-                            .findColumns(connection)
-                            .build(connection);
-                    database.getTables().add(table);
+                            .findColumns(connection);
+                    this.builders.add(tableBuilder);
                 }
             } catch (SQLException e) {
                 throw new RuntimeException("Failed adding existing tables", e);
             }
+            return this;
         }
 
         private Class<?> determinePrimaryKeyClass(Connection connection, String tableName) throws SQLException {
@@ -227,7 +254,10 @@ public class Database {
             Database database = new Database();
             database.path(this.path);
             database.closeConnection();
-            if (addExistingTables) this.addExistingTables(database);
+            this.addExistingTables(database)
+                    .addTablesIfNotExists()
+                    .addAndOverride();
+            System.out.println(this.builders.size());
             database.tables(this.builders);
             return database;
         }

@@ -1,8 +1,14 @@
 package me.vermulst.vermulstutils.data;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.sql.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static me.vermulst.vermulstutils.data.Column.REVERSED_TYPE_MAP_STRING;
 
 public class Table<PK> {
 
@@ -13,7 +19,6 @@ public class Table<PK> {
     protected Table(Class<PK> type) {
         this.type = type;
     }
-
 
     public <T> Column<T> getColumn(Class<T> columnType, String name) {
         Optional<Column<?>> columnOptional = columns.stream()
@@ -37,6 +42,7 @@ public class Table<PK> {
             throw new RuntimeException("Failed creating statement for table: " + this.name, e);
         }
         if (update) {
+            System.out.println("updating");
             this.update(connection);
         }
     }
@@ -76,17 +82,75 @@ public class Table<PK> {
     protected boolean tableChanged(Statement statement) {
         Set<String> currentColumnNames = new HashSet<>();
         Set<String> currentColumnTypes = new HashSet<>();
+        Map<String, Set<Column.ColumnProperty>> currentColumnProperties = new HashMap<>();
+        Map<String, Object> defaultValues = new HashMap<>();
 
         try {
-            ResultSet resultSet = statement.executeQuery("PRAGMA table_info(" + this.name + ")");
-            while (resultSet.next()) {
-                String columnName = resultSet.getString("name");
-                String columnType = resultSet.getString("type");
-                currentColumnNames.add(columnName);
-                currentColumnTypes.add(columnType); // Combine name and type for comparison
+            ResultSet tableSql = statement.executeQuery("SELECT sql FROM sqlite_master WHERE type='table' AND name='" + this.name + "'");
+            if (!tableSql.next()) {
+                throw new RuntimeException("Table " + this.name + " does not exist in the database.");
             }
+            String createTableSql = tableSql.getString("sql");
+            // Extract column definitions from the CREATE TABLE statement
+            String columnRegex = "(\\w+)\\s+([\\w\\s]+)(?:DEFAULT\\s+([\\w\\d]+))?";
+            Pattern columnPattern = Pattern.compile(columnRegex);
+            Matcher matcher = columnPattern.matcher(createTableSql);
+            Pattern pkPattern = Pattern.compile("PRIMARY KEY\\s*\\(([^\\)]+)\\)", Pattern.CASE_INSENSITIVE);
+            Matcher primaryKeyMatcher = pkPattern.matcher(createTableSql);
+
+            if (primaryKeyMatcher.find()) {
+                String[] primaryKeyColumns = primaryKeyMatcher.group(1).split(",");
+                for (String primaryKey : primaryKeyColumns) {
+                    primaryKey = primaryKey.trim();
+                    currentColumnProperties.put(primaryKey, new HashSet<>(List.of(Column.ColumnProperty.PRIMARY_KEY)));
+                }
+            }
+
+            while (matcher.find()) {
+                String columnName = matcher.group(1);
+                String[] typeAndConstraints = matcher.group(2).trim().split(" ");
+
+                if (columnName.equals("PRIMARY") || columnName.equals("CREATE")) continue;
+                currentColumnNames.add(columnName);
+                String columnType = typeAndConstraints[0];
+                currentColumnTypes.add(columnType);
+                int endIndex = typeAndConstraints.length;
+                if (typeAndConstraints.length >= 2 && typeAndConstraints[typeAndConstraints.length - 2].equals("DEFAULT")) {
+                    endIndex -= 2;
+                    String defaultValueString = typeAndConstraints[typeAndConstraints.length - 1];
+                    Class typeCast = REVERSED_TYPE_MAP_STRING.get(columnType);
+                    Method castMethod = typeCast.getDeclaredMethod("valueOf", String.class);
+                    Object defaultValue = castMethod.invoke(typeCast, defaultValueString);
+                    defaultValues.put(columnName, defaultValue);
+                } else {
+                    defaultValues.put(columnName, "NO_DEFAULT");
+                }
+                Set<Column.ColumnProperty> columnProperties = new HashSet<>();
+                for (int i = 1; i < endIndex; i++) {
+                    String type = typeAndConstraints[i];
+                    if ("NOT".equals(type)) {
+                        columnProperties.add(Column.ColumnProperty.NOT_NULL);
+                        i++;
+                    } else if ("UNIQUE".equals(type)) {
+                        columnProperties.add(Column.ColumnProperty.UNIQUE);
+                    } else if ("AUTOINCREMENT".equals(type)) {
+                        columnProperties.add(Column.ColumnProperty.AUTO_INCREMENT_PRIMARY_KEY);
+                    }
+                }
+                if (!currentColumnProperties.containsKey(columnName)) {
+                    currentColumnProperties.put(columnName, new HashSet<>());
+                }
+                currentColumnProperties.get(columnName).addAll(columnProperties);
+            }
+
         } catch (SQLException e) {
             throw new RuntimeException("Failed to get table info: " + this.name, e);
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        } catch (InvocationTargetException e) {
+            throw new RuntimeException(e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
         }
 
         // Compare column names
@@ -98,11 +162,28 @@ public class Table<PK> {
                 .map(Column::getColumnTypeName)
                 .collect(Collectors.toSet());
 
+        Map<String, Set<Column.ColumnProperty>> definedColumnProperties = this.columns.stream()
+                .collect(Collectors.toMap(
+                        Column::getName,                  // Key: column name
+                        Column::getColumnProperties      // Value: column properties
+                ));
+
+
+        Map<String, Object> definedDefaultValues = this.columns.stream()
+                .collect(Collectors.toMap(
+                        Column::getName,                  // Key: column name
+                        column -> column.getDefaultValue() != null
+                                ? column.getDefaultValue()
+                                : "NO_DEFAULT"          // Replace null with a placeholder
+                ));
+
         // Compare column names and types to check if any changes occurred
         boolean namesChanged = !currentColumnNames.equals(definedColumnNames);
         boolean typesChanged = !currentColumnTypes.equals(definedColumnTypes);
+        boolean propertiesChanged = !currentColumnProperties.equals(definedColumnProperties);
+        boolean defaultValueChanged = !defaultValues.equals(definedDefaultValues);
 
-        return namesChanged || typesChanged;
+        return namesChanged || typesChanged || propertiesChanged || defaultValueChanged;
     }
 
     private String getCreateStatement() {
@@ -223,6 +304,10 @@ public class Table<PK> {
         return columns;
     }
 
+    public Class<PK> getType() {
+        return type;
+    }
+
     public Builder<PK> toBuilder() {
         return new Builder<>(this.type)
                 .name(this.name)
@@ -270,10 +355,12 @@ public class Table<PK> {
                 while (rs.next()) {
                     String columnName = rs.getString("COLUMN_NAME");
                     int dataType = rs.getInt("DATA_TYPE");
+                    if ("BIGINT".equalsIgnoreCase(rs.getString("TYPE_NAME")) && dataType == 4) {
+                        dataType = Types.BIGINT; // Correct the type
+                    }
                     boolean isNullable = rs.getInt("NULLABLE") == DatabaseMetaData.columnNoNulls;
                     boolean isPrimaryKey = isPrimaryKey(connection, columnName);
 
-                    // Construct the Column based on its metadata
                     Column.Builder columnBuilder = Column.builder(Column.REVERSED_TYPE_MAP.get(dataType))
                             .name(columnName);
 
@@ -281,6 +368,7 @@ public class Table<PK> {
                     if (isPrimaryKey) columnBuilder.addColumnProperty(Column.ColumnProperty.PRIMARY_KEY);
 
                     // Add the column to the table
+
                     this.columns.add(columnBuilder.build());
                 }
 
@@ -326,6 +414,10 @@ public class Table<PK> {
         public Builder<PK> columnBuilders(List<Column.Builder> columnBuilders) {
             List<Column<?>> columns = new ArrayList<>();
             for (Column.Builder columnBuilder : columnBuilders) {
+                Column column = columnBuilder.build();
+                if (column.getColumnProperties().contains(Column.ColumnProperty.UNIQUE)) {
+
+                }
                 columns.add(columnBuilder.build());
             }
             this.columns = columns;
@@ -340,6 +432,10 @@ public class Table<PK> {
         public Builder<PK> addColumn(Column.Builder columnBuilder) {
             this.columns.add(columnBuilder.build());
             return this;
+        }
+
+        public List<Column<?>> getColumns() {
+            return columns;
         }
 
         protected Table build(Connection connection) {
@@ -378,7 +474,19 @@ public class Table<PK> {
             sql.append(column.getName()).append(" FROM ").append(this.table.name);
             sql.append(this.getPrimaryKeyCondition(primaryKey));
             try (Statement statement = connection.createStatement()) {
-                return statement.executeQuery(sql.toString()).getObject(1, column.getType());
+                ResultSet result = statement.executeQuery(sql.toString());
+                if (result.next()) {
+                    try {
+                        return result.getObject(1, column.getType()); // Use conversion
+                    } catch (SQLException e) {
+                        if (result.wasNull()) { // Check explicitly for NULL handling
+                            return null;
+                        }
+                        throw e; // Rethrow other SQLExceptions
+                    }
+                } else {
+                    return null;
+                }
             } catch (SQLException e) {
                 throw new RuntimeException("Failed loading value", e);
             }
@@ -521,8 +629,13 @@ public class Table<PK> {
             super(table);
         }
 
-        public void deleteRow(PK primaryKey) {
-
+        public void deleteEntry(PK primaryKey) {
+            String sql = "DELETE FROM " + this.table.name + this.getPrimaryKeyCondition(primaryKey);
+            try (Statement statement = this.connection.createStatement()) {
+                statement.executeUpdate(sql);
+            } catch (SQLException e) {
+                throw new RuntimeException("Error inserting value into the table", e);
+            }
         }
     }
 

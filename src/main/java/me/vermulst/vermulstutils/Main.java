@@ -8,12 +8,4 @@ public final class Main  {
      * Column deleter
      * Column renamer
      */
-
-    //@Override
-    public void onEnable() {
-    }
-
-    //@Override
-    public void onDisable() {
-    }
 }

@@ -1,15 +1,13 @@
 package me.vermulst.vermulstutils.data;
 
 import java.sql.Types;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class Column<T> {
 
     protected static final Map<Class<?>, String> TYPE_MAP = new HashMap<>();
     protected static final Map<Integer, Class<?>> REVERSED_TYPE_MAP;
+    protected static final Map<String, Class<?>> REVERSED_TYPE_MAP_STRING;
 
     static {
         TYPE_MAP.put(Integer.class, "INTEGER");
@@ -28,6 +26,14 @@ public class Column<T> {
         REVERSED_TYPE_MAP.put(Types.BOOLEAN, Boolean.class);
         REVERSED_TYPE_MAP.put(Types.FLOAT, Float.class);
         REVERSED_TYPE_MAP.put(Types.DOUBLE, Double.class);
+
+        REVERSED_TYPE_MAP_STRING = new HashMap<>();
+        REVERSED_TYPE_MAP_STRING.put("INTEGER", Integer.class);
+        REVERSED_TYPE_MAP_STRING.put("SMALLINT", Short.class);
+        REVERSED_TYPE_MAP_STRING.put("BIGINT", Long.class);
+        REVERSED_TYPE_MAP_STRING.put("BOOLEAN", Boolean.class);
+        REVERSED_TYPE_MAP_STRING.put("REAL", Float.class);
+        REVERSED_TYPE_MAP_STRING.put("TEXT", String.class);
     }
 
     private interface ColumnPropertyDefinition {
@@ -150,7 +156,7 @@ public class Column<T> {
         }
 
         public Builder<T> columnProperties(ColumnProperty... columnProperties) {
-            this.columnProperties = Set.of(columnProperties);
+            this.columnProperties = new HashSet<>(List.of(columnProperties));
             return this;
         }
 

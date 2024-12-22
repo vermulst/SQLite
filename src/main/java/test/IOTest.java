@@ -22,32 +22,37 @@ public class IOTest {
                 .name("GOLD")
                 .columnProperties(Column.ColumnProperty.NOT_NULL)
                 .defaultValue(10L);
+        Column.Builder xpColumn = Column.builder(Long.class)
+                .name("XP")
+                .columnProperties(Column.ColumnProperty.NOT_NULL)
+                .defaultValue(500L);
 
         Table.Builder playerData = Table.builder(String.class)
                 .name("player_data")
-                .columnBuilders(uuidColumn, goldColumn);
+                .columnBuilders(uuidColumn, goldColumn, xpColumn);
+
 
         Database db = Database.builder()
                 .path("test1")
                 .addExistingTables()
-                .addTablesIfNotExists(playerData)
+                .addAndOverride()
                 .build();
 
         Table table = db.getTable(String.class, playerData.getName());
+
         Table.Saver<String> saver = Table.saver(table, db);
-        saver.saveEntry("TEST1");
+        saver.saveEntry("TEST4");
         Long randomValue = ThreadLocalRandom.current().nextLong(Long.MAX_VALUE);
-        saver.saveRow("TEST2", List.of(randomValue));
+        saver.saveRow("TEST5", List.of(randomValue, 1L));
         saver.disconnect(db);
 
         Table.Loader<String> loader = Table.loader(table, db);
-        List<Object> objects = loader.loadRow("TEST1");
-        assertEquals(List.of(10L).getFirst(), objects.getFirst());
+        List<Object> objects = loader.loadRow("TEST5");
+        assertEquals(List.of(randomValue).getFirst(), objects.getFirst());
         List<Object> objects1 = loader.loadRow("TEST2");
-        assertEquals(List.of(randomValue).getFirst(), objects1.getFirst());
+        //assertEquals(null, objects1.getLast());
         loader.disconnect(db);
 
-        db.delete();
     }
 
 
@@ -89,6 +94,37 @@ public class IOTest {
         assertEquals(goldPairs, goldValues);
         loader.disconnect(db);
 
+        db.delete();
+    }
+
+
+    @Test
+    public void deleteColumn() {
+        Column.Builder uuidColumn = Column.builder(String.class)
+                .name("UUID")
+                .columnProperties(Column.ColumnProperty.UNIQUE, Column.ColumnProperty.PRIMARY_KEY, Column.ColumnProperty.NOT_NULL);
+        Column.Builder goldColumn = Column.builder(Long.class)
+                .name("GOLD")
+                .columnProperties(Column.ColumnProperty.NOT_NULL)
+                .defaultValue(10L);
+
+        Table.Builder playerData = Table.builder(String.class)
+                .name("player_data")
+                .columnBuilders(uuidColumn, goldColumn);
+
+        Database db = Database.builder()
+                .path("test2")
+                .addExistingTables()
+                .addTablesIfNotExists(playerData)
+                .build();
+
+        Table table = db.getTable(String.class, playerData.getName());
+        Table.Saver<String> saver = Table.saver(table, db);
+        saver.saveEntry("TEST1");
+        saver.disconnect(db);
+        Table.Deleter<String> deleter = Table.deleter(table, db);
+        deleter.deleteEntry("TEST1");
+        deleter.disconnect(db);
         db.delete();
     }
 

@@ -1,15 +1,18 @@
 plugins {
     id 'java'
     id 'com.gradleup.shadow' version '8.3.1'
-    id 'io.papermc.paperweight.userdev' version "1.7.2"
+    id 'io.papermc.paperweight.userdev' version "1.7.7"
 }
 
 group = 'me.vermulst'
 version = '1.0-SNAPSHOT'
 
 allprojects {
-    buildDir = "C:/Users/SAM/Desktop/1.21/plugins"
-    //buildDir = "C:/Users/20233490/Desktop/PLUGINS"
+    // PC URL
+    buildDir = "D:/Minecraft/1.21_used/plugins"
+
+    // LAPTOP URL
+    //buildDir = "C:/Users/20233490/Desktop/1.21"
 }
 
 repositories {
@@ -29,7 +32,7 @@ test {
 }
 
 dependencies {
-    paperweight.paperDevBundle("1.21.1-R0.1-SNAPSHOT")
+    paperweight.paperDevBundle("1.21.4-R0.1-SNAPSHOT")
     implementation 'org.xerial:sqlite-jdbc:3.46.1.0'
     implementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
     runtimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
