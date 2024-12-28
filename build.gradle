@@ -22,10 +22,6 @@ repositories {
         name = "papermc-repo"
         url = "https://repo.papermc.io/repository/maven-public/"
     }
-    maven {
-        name = "sonatype"
-        url = "https://oss.sonatype.org/content/groups/public/"
-    }
 }
 
 test {
@@ -34,9 +30,6 @@ test {
 
 dependencies {
     paperweight.paperDevBundle("1.21.4-R0.1-SNAPSHOT")
-    implementation 'org.xerial:sqlite-jdbc:3.46.1.0'
-    implementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
-    runtimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
 }
 
 def targetJavaVersion = 21
@@ -69,7 +62,11 @@ processResources {
 
 publishing {
     publications {
-        mavenJava(MavenPublication) {
+        maven(MavenPublication) {
+            groupId = 'me.vermulst.vermulstutils'
+            artifactId = 'SQLite'
+            version = '0.3'
+
             from components.java
         }
     }

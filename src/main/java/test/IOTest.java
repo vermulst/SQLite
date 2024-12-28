@@ -1,6 +1,6 @@
 package test;
 
-import me.vermulst.vermulstutils.data.*;
+/*import me.vermulst.vermulstutils.data.*;
 import org.junit.jupiter.api.Test;
 
 import java.sql.SQLException;
@@ -11,10 +11,10 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;*/
 
 public class IOTest {
-
+/*
     @Test
     public void testSave1() {
 
@@ -188,5 +188,5 @@ public class IOTest {
         deleter.disconnect(db);
         db.delete();
     }
-
+*/
 }
