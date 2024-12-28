@@ -85,11 +85,13 @@ public class IOTest {
 
         Table table = db.getTable(String.class, playerData.getName());
 
-        Table.Saver<String> saver = Table.saver(table, db);
-        saver.saveEntry("TEST4");
         Long randomValue = ThreadLocalRandom.current().nextLong(Long.MAX_VALUE);
-        saver.saveRow("TEST5", List.of(randomValue, 1L));
-        saver.disconnect(db);
+        try (Table.Saver<String> saver = Table.saver(table, db)) {
+            saver.saveEntry("TEST4");
+            saver.saveRow("TEST5", List.of(randomValue, 1L));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         for (Object obj : table.getColumns()) {
             if (obj instanceof Column<?> column) {

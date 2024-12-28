@@ -514,7 +514,7 @@ public class Table<PK> {
     }
 
 
-    public static class Loader<PK> extends TableIO<PK> {
+    public static class Loader<PK> extends TableIO<PK> implements AutoCloseable {
 
         private Loader(Table table) {
             super(table);

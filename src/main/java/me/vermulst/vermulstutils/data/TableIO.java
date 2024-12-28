@@ -7,7 +7,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
-public class TableIO<PK> {
+public class TableIO<PK> implements AutoCloseable {
 
     protected final Table<PK> table;
     protected Connection connection;
@@ -65,5 +65,11 @@ public class TableIO<PK> {
 
     protected boolean isDisconnected() {
         return this.connection == null;
+    }
+
+    @Override
+    public void close() throws Exception {
+        if (this.connection == null || this.connection.isClosed()) return;
+        this.connection.close();
     }
 }
