@@ -5,8 +5,8 @@ plugins {
     id("io.papermc.paperweight.userdev") version "2.0.0-beta.8"
 }
 
-group = 'me.vermulst'
-version = '1.0-SNAPSHOT'
+group = 'com.github.vermulst'
+version = '0.2'
 
 allprojects {
     if (System.getenv("COMPUTERNAME").contentEquals("DESKTOP-K68G3D6")) {
@@ -22,10 +22,6 @@ repositories {
         name = "papermc-repo"
         url = "https://repo.papermc.io/repository/maven-public/"
     }
-}
-
-test {
-    useJUnitPlatform()
 }
 
 dependencies {
@@ -75,12 +71,14 @@ publishing {
 }
 
 
+
 tasks.named('shadowJar') {
     archiveBaseName.set("${project.name}-${project.version}")
     archiveClassifier.set('')
     archiveVersion.set('')
     destinationDirectory.set(layout.buildDirectory.get())
     finalizedBy('reobfJar', 'cleanFolders')
+    relocate 'org.xerial', 'me.vermulst.vermulstutils.dependencies.xerial'
 }
 
 tasks.register('cleanFolders', Delete) {
