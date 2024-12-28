@@ -30,6 +30,7 @@ test {
 
 dependencies {
     paperweight.paperDevBundle("1.21.4-R0.1-SNAPSHOT")
+    implementation 'org.xerial:sqlite-jdbc:3.46.1.0'
 }
 
 def targetJavaVersion = 21
@@ -63,6 +64,10 @@ processResources {
 publishing {
     publications {
         maven(MavenPublication) {
+            groupId = 'me.vermulst.vermulstutils'
+            artifactId = 'SQLite'
+            version = '0.3'
+
             from components.java
         }
     }
