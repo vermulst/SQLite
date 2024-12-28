@@ -9,10 +9,13 @@ group = 'com.github.vermulst'
 version = '0.2'
 
 allprojects {
-    if (System.getenv("COMPUTERNAME").contentEquals("DESKTOP-K68G3D6")) {
-        layout.buildDirectory.set(file("D:/Minecraft/1.21_used/plugins"))
-    } else {
-        layout.buildDirectory.set(file("C:/Users/20233490/Desktop/1.21"))
+    def computerName = System.getenv("COMPUTERNAME")
+    if (computerName != null) {
+        if (computerName.contentEquals("DESKTOP-K68G3D6")) {
+            layout.buildDirectory.set(file("D:/Minecraft/1.21_used/plugins"))
+        } else {
+            layout.buildDirectory.set(file("D:/Minecraft/1.21_used/plugins"))
+        }
     }
 }
 
