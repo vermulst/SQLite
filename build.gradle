@@ -63,10 +63,6 @@ processResources {
 publishing {
     publications {
         maven(MavenPublication) {
-            groupId = 'me.vermulst.vermulstutils'
-            artifactId = 'SQLite'
-            version = '0.3'
-
             from components.java
         }
     }
