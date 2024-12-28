@@ -58,12 +58,6 @@ public class Column<T> {
             public String getDefinition() {
                 return "";
             }
-        },
-        AUTO_INCREMENT_PRIMARY_KEY {
-            @Override
-            public String getDefinition() {
-                return "AUTOINCREMENT";
-            }
         };
     }
 
@@ -84,7 +78,7 @@ public class Column<T> {
     }
 
     public boolean isPrimaryKey() {
-        return this.columnProperties.contains(ColumnProperty.PRIMARY_KEY) || this.columnProperties.contains(ColumnProperty.AUTO_INCREMENT_PRIMARY_KEY);
+        return this.columnProperties.contains(ColumnProperty.PRIMARY_KEY);
     }
 
     protected String getColumnDefinition() {
@@ -128,6 +122,19 @@ public class Column<T> {
                 .name(name)
                 .columnProperties(columnProperties)
                 .defaultValue(defaultValue);
+    }
+
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) return true;
+        if (object == null || getClass() != object.getClass()) return false;
+        Column<?> column = (Column<?>) object;
+        return Objects.equals(name, column.name) && Objects.equals(columnProperties, column.columnProperties) && Objects.equals(defaultValue, column.defaultValue) && Objects.equals(type, column.type);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, columnProperties, defaultValue, type);
     }
 
     public static <T> Builder<T> builder(Class<T> type) {

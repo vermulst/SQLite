@@ -16,6 +16,9 @@ public class Table<PK> {
     protected List<Column<?>> columns = new ArrayList<>();
     protected Class<PK> type;
 
+    // Foreign key map: foreign key column -> referenced table
+    protected final Set<ForeignKeyReference> foreignKeyReferences = new HashSet<>();
+
     protected Table(Class<PK> type) {
         this.type = type;
     }
@@ -79,7 +82,7 @@ public class Table<PK> {
     /**
      * Checks if the table structure has changed in the database compared to the defined structure.
      */
-    protected boolean tableChanged(Statement statement) {
+    public boolean tableChanged(Statement statement) {
         Set<String> currentColumnNames = new HashSet<>();
         Set<String> currentColumnTypes = new HashSet<>();
         Map<String, Set<Column.ColumnProperty>> currentColumnProperties = new HashMap<>();
@@ -109,7 +112,6 @@ public class Table<PK> {
             while (matcher.find()) {
                 String columnName = matcher.group(1);
                 String[] typeAndConstraints = matcher.group(2).trim().split(" ");
-
                 if (columnName.equals("PRIMARY") || columnName.equals("CREATE")) continue;
                 currentColumnNames.add(columnName);
                 String columnType = typeAndConstraints[0];
@@ -133,8 +135,6 @@ public class Table<PK> {
                         i++;
                     } else if ("UNIQUE".equals(type)) {
                         columnProperties.add(Column.ColumnProperty.UNIQUE);
-                    } else if ("AUTOINCREMENT".equals(type)) {
-                        columnProperties.add(Column.ColumnProperty.AUTO_INCREMENT_PRIMARY_KEY);
                     }
                 }
                 if (!currentColumnProperties.containsKey(columnName)) {
@@ -186,7 +186,7 @@ public class Table<PK> {
         return namesChanged || typesChanged || propertiesChanged || defaultValueChanged;
     }
 
-    private String getCreateStatement() {
+    public String getCreateStatement() {
         StringBuilder builder = new StringBuilder();
         builder.append("CREATE TABLE IF NOT EXISTS ").append(this.name).append(" (");
         int totalSize = this.columns.size();
@@ -200,30 +200,17 @@ public class Table<PK> {
 
         List<String> primaryKeys = this.getPrimaryKeyNames();
         if (!primaryKeys.isEmpty()) {
-            this.checkValidAutoIncrement(primaryKeys);
             builder.append(", PRIMARY KEY (");
             builder.append(String.join(", ", primaryKeys));
             builder.append(")");
         }
 
+        builder.append(this.getForeignKeyConstraints());
+
         builder.append(");");
         return builder.toString();
     }
 
-    private void checkValidAutoIncrement(List<String> primaryKeys) {
-        long autoIncrementCount = this.columns
-                .stream()
-                .filter(column -> column.getColumnProperties().contains(Column.ColumnProperty.AUTO_INCREMENT_PRIMARY_KEY))
-                .count();
-        if (autoIncrementCount > 0) {
-            if (autoIncrementCount > 1) {
-                throw new IllegalStateException("Cannot have multiple primary keys with AUTOINCREMENT.");
-            }
-            if (primaryKeys.size() > 1) {
-                throw new IllegalStateException("Cannot have composite primary key with AUTOINCREMENT.");
-            }
-        }
-    }
 
     protected List<Object> getPrimaryKeyObjects(PK primaryKey) {
         return primaryKey instanceof CompositeKey compositeKey ? compositeKey.getKeyParts() : List.of(primaryKey);
@@ -241,6 +228,18 @@ public class Table<PK> {
                 .stream().filter(Column::isPrimaryKey)
                 .map(Column::getName)
                 .collect(Collectors.toList());
+    }
+
+    protected String getForeignKeyConstraints() {
+        StringBuilder foreignKeysSql = new StringBuilder();
+        for (ForeignKeyReference foreignKey : foreignKeyReferences) {
+            foreignKeysSql.append(foreignKey.getStatement()).append(", ");
+        }
+        if (!foreignKeysSql.isEmpty()) {
+            // Remove trailing comma
+            foreignKeysSql.setLength(foreignKeysSql.length() - 2);
+        }
+        return foreignKeysSql.toString();
     }
 
     protected List<Column<?>> getPrimaryKeyColumns() {
@@ -314,6 +313,19 @@ public class Table<PK> {
                 .columns(columns);
     }
 
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) return true;
+        if (object == null || getClass() != object.getClass()) return false;
+        Table<?> table = (Table<?>) object;
+        return Objects.equals(name, table.name) && Objects.equals(columns, table.columns) && Objects.equals(type, table.type);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, columns, type);
+    }
+
     public static <PK> Builder<PK> builder(Class<PK> primaryKeyType) {
         return new Builder<>(primaryKeyType);
     }
@@ -336,12 +348,13 @@ public class Table<PK> {
         return deleter;
     }
 
-
     public static class Builder<PK> {
 
         private String name;
         private List<Column<?>> columns = new ArrayList<>();
         private final Class<PK> primaryKeyType;
+
+        private Set<ForeignKeyReference> foreignKeyReferences = new HashSet<>();
 
         private Builder(Class<PK> primaryKeyType) {
             this.primaryKeyType = primaryKeyType;
@@ -358,14 +371,16 @@ public class Table<PK> {
                     if ("BIGINT".equalsIgnoreCase(rs.getString("TYPE_NAME")) && dataType == 4) {
                         dataType = Types.BIGINT; // Correct the type
                     }
-                    boolean isNullable = rs.getInt("NULLABLE") == DatabaseMetaData.columnNoNulls;
+                    boolean isNotNull = rs.getInt("NULLABLE") == DatabaseMetaData.columnNoNulls;
                     boolean isPrimaryKey = isPrimaryKey(connection, columnName);
+                    boolean isUnique = isUnique(connection, columnName);
 
                     Column.Builder columnBuilder = Column.builder(Column.REVERSED_TYPE_MAP.get(dataType))
                             .name(columnName);
 
-                    if (!isNullable) columnBuilder.addColumnProperty(Column.ColumnProperty.NOT_NULL);
+                    if (isNotNull) columnBuilder.addColumnProperty(Column.ColumnProperty.NOT_NULL);
                     if (isPrimaryKey) columnBuilder.addColumnProperty(Column.ColumnProperty.PRIMARY_KEY);
+                    if (isUnique) columnBuilder.addColumnProperty(Column.ColumnProperty.UNIQUE);
 
                     // Add the column to the table
 
@@ -379,6 +394,48 @@ public class Table<PK> {
             return this;
         }
 
+        protected Builder<PK> findForeignKeys(Connection connection) {
+            try {
+                DatabaseMetaData metaData = connection.getMetaData();
+
+                // Query foreign keys for the current table
+                ResultSet foreignKeyRs = metaData.getImportedKeys(null, null, name);
+
+                while (foreignKeyRs.next()) {
+                    String fkColumnName = foreignKeyRs.getString("FKCOLUMN_NAME"); // Child column (foreign key)
+                    String pkTableName = foreignKeyRs.getString("PKTABLE_NAME"); // Referenced table (parent)
+                    String pkColumnName = foreignKeyRs.getString("PKCOLUMN_NAME"); // Parent column (primary key)
+
+                    // Add to the foreign key references set
+                    foreignKeyReferences.add(new ForeignKeyReference(fkColumnName, pkTableName, pkColumnName));
+                }
+
+                foreignKeyRs.close();
+
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed to retrieve foreign keys for table: " + name, e);
+            }
+            return this;
+        }
+
+        private boolean isUnique(Connection connection, String columnName) throws SQLException {
+            DatabaseMetaData metaData = connection.getMetaData();
+            ResultSet indexRs = metaData.getIndexInfo(null, null, name, true, false);
+
+            while (indexRs.next()) {
+                String indexedColumn = indexRs.getString("COLUMN_NAME");
+                boolean isUnique = !indexRs.getBoolean("NON_UNIQUE");
+
+                if (columnName.equals(indexedColumn) && isUnique) {
+                    indexRs.close();
+                    return true;
+                }
+            }
+
+            indexRs.close();
+            return false;
+        }
+
         private boolean isPrimaryKey(Connection connection, String columnName) throws SQLException {
             ResultSet pkResultSet = connection.getMetaData().getPrimaryKeys(null, null, name);
             while (pkResultSet.next()) {
@@ -390,6 +447,11 @@ public class Table<PK> {
             }
             pkResultSet.close();
             return false;
+        }
+
+        public Builder<PK> foreignKeys(ForeignKeyReference... foreignKeyReferences) {
+            this.foreignKeyReferences = Set.of(foreignKeyReferences);
+            return this;
         }
 
         public Builder<PK> name(String name) {

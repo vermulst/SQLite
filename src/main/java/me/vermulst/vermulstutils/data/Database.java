@@ -24,7 +24,6 @@ public class Database {
             for (Table.Builder builder : tableBuilders) {
                 Table table = builder.build(connection);
                 this.addTable(table);
-                System.out.println("added table");
             }
             connection.commit();
         } catch (SQLException e) {
@@ -135,6 +134,18 @@ public class Database {
         return this.tables.stream().map(Table::getName).collect(Collectors.toUnmodifiableSet());
     }
 
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) return true;
+        if (object == null || getClass() != object.getClass()) return false;
+        Database database = (Database) object;
+        return Objects.equals(path, database.path) && Objects.equals(tables, database.tables);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(path, connection, tables);
+    }
 
     public static Builder builder() {
         return new Builder();
@@ -143,8 +154,8 @@ public class Database {
     public static class Builder {
 
         private String path;
-        private Set<Table.Builder> builders = new HashSet<>();
-        private boolean addExistingTables = false;
+        private final Set<Table.Builder> builders = new HashSet<>();
+        private boolean addExistingTables = true;
         private Set<Table.Builder> addAndOverride;
         private Set<Table.Builder> addIfNotExists;
 
@@ -196,8 +207,8 @@ public class Database {
             this.builders.addAll(this.addAndOverride);
         }
 
-        public Builder addExistingTables() {
-            addExistingTables = true;
+        public Builder clearExistingTables() {
+            addExistingTables = false;
             return this;
         }
 

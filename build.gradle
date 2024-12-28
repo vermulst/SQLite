@@ -1,18 +1,19 @@
 plugins {
-    id 'java'
-    id 'com.gradleup.shadow' version '8.3.1'
-    id 'io.papermc.paperweight.userdev' version "1.7.7"
+    id("java")
+    id("maven-publish")
+    id("com.gradleup.shadow") version "9.0.0-beta4"
+    id("io.papermc.paperweight.userdev") version "2.0.0-beta.8"
 }
 
 group = 'me.vermulst'
 version = '1.0-SNAPSHOT'
 
 allprojects {
-    // PC URL
-    buildDir = "D:/Minecraft/1.21_used/plugins"
-
-    // LAPTOP URL
-    //buildDir = "C:/Users/20233490/Desktop/1.21"
+    if (System.getenv("COMPUTERNAME").contentEquals("DESKTOP-K68G3D6")) {
+        layout.buildDirectory.set(file("D:/Minecraft/1.21_used/plugins"))
+    } else {
+        layout.buildDirectory.set(file("C:/Users/20233490/Desktop/1.21"))
+    }
 }
 
 repositories {
@@ -63,21 +64,32 @@ processResources {
     }
 }
 
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url "https://jitpack.io"
+        }
+    }
+}
 
-shadowJar {
+
+tasks.named('shadowJar') {
     archiveBaseName.set("${project.name}-${project.version}")
     archiveClassifier.set('')
     archiveVersion.set('')
-    destinationDirectory.set(file("$buildDir"))
+    destinationDirectory.set(layout.buildDirectory.get())
+    finalizedBy('reobfJar', 'cleanFolders')
 }
 
-task cleanFolders(type: Delete) {
-    delete "$buildDir/libs"
-    delete "$buildDir/classes"
-    delete "$buildDir/generated"
-    delete "$buildDir/resources"
-    delete "$buildDir/tmp"
+tasks.register('cleanFolders', Delete) {
+    delete layout.buildDirectory.dir("libs")
+    delete layout.buildDirectory.dir("classes")
+    delete layout.buildDirectory.dir("generated")
+    delete layout.buildDirectory.dir("resources")
+    delete layout.buildDirectory.dir("tmp")
 }
-
-shadowJar.finalizedBy(reobfJar)
-shadowJar.finalizedBy(cleanFolders)
