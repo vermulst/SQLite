@@ -8,16 +8,16 @@ plugins {
 group = 'com.github.vermulst'
 version = '0.2'
 
-allprojects {
+/*allprojects {
     def computerName = System.getenv("COMPUTERNAME")
     if (computerName != null) {
         if (computerName.contentEquals("DESKTOP-K68G3D6")) {
             layout.buildDirectory.set(file("D:/Minecraft/1.21_used/plugins"))
         } else {
-            layout.buildDirectory.set(file("D:/Minecraft/1.21_used/plugins"))
+            layout.buildDirectory.set(file("C:/Users/20233490/Desktop/1.21"))
         }
     }
-}
+}*/
 
 repositories {
     mavenCentral()
@@ -96,17 +96,18 @@ publishing {
 
 
 tasks.named('shadowJar') {
-    archiveBaseName.set("${project.name}-${project.version}")
+    /*archiveBaseName.set("${project.name}-${project.version}")
     archiveClassifier.set('')
-    archiveVersion.set('')
-    finalizedBy('reobfJar', 'cleanFolders')
+    archiveVersion.set('')*/
     relocate("org.xerial", "me.vermulst.vermulstutils.dependencies.xerial")
+    finalizedBy('reobfJar'//, 'cleanFolders'
+                )
 }
 
-tasks.register('cleanFolders', Delete) {
+/*tasks.register('cleanFolders', Delete) {
     delete layout.buildDirectory.dir("libs")
     delete layout.buildDirectory.dir("classes")
     delete layout.buildDirectory.dir("generated")
     delete layout.buildDirectory.dir("resources")
     delete layout.buildDirectory.dir("tmp")
-}
+}*/
